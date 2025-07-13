@@ -1,0 +1,113 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: chicken-hen-web
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Install Serverless Framework
+      run: npm install -g serverless@3
+    
+    - name: Deploy to AWS
+      run: serverless deploy --stage prod
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+    
+    - name: Deploy static files to S3
+      run: |
+        # Get the S3 bucket name from serverless info
+        BUCKET_NAME=$(serverless info --stage prod --verbose | grep -o 'S3BucketName: [^ ]*' | cut -d' ' -f2)
+        
+        # Sync client files to S3
+        aws s3 sync ./client s3://$BUCKET_NAME/ --delete \
+          --exclude '.DS_Store' \
+          --exclude '*.sh' \
+          --cache-control "no-cache, no-store, must-revalidate" \
+          --content-type "text/html" \
+          --exclude '*.js'
+        
+        # Sync JavaScript files with different cache settings
+        aws s3 sync ./client s3://$BUCKET_NAME/ --delete \
+          --exclude '.DS_Store' \
+          --exclude '*.sh' \
+          --exclude '*.html' \
+          --include '*.js' \
+          --cache-control "public, max-age=31536000" \
+          --content-type "application/javascript"
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+    
+    - name: Invalidate CloudFront
+      run: |
+        # Get CloudFront distribution ID
+        BUCKET_NAME=$(serverless info --stage prod --verbose | grep -o 'S3BucketName: [^ ]*' | cut -d' ' -f2)
+        DISTRIBUTION_ID=$(aws cloudfront list-distributions --query "DistributionList.Items[?Origins.Items[0].DomainName=='$BUCKET_NAME.s3.amazonaws.com'].Id" --output text)
+        
+        # Create invalidation if distribution exists
+        if [ ! -z "$DISTRIBUTION_ID" ]; then
+          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths '/*'
+        fi
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+
+  smoke-test:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Install test dependencies
+      run: npm install ws
+      working-directory: chicken-hen-web
+    
+    - name: Run WebSocket smoke test
+      run: node scripts/test-websocket.js
+      working-directory: chicken-hen-web
+      timeout-minutes: 2
+    
+    - name: Test CloudFront deployment
+      run: |
+        # Get CloudFront URL from deployment
+        cd chicken-hen-web
+        npm install -g serverless@3
+        CLOUDFRONT_URL=$(serverless info --stage prod --verbose | grep -o 'StaticSiteURL: [^ ]*' | cut -d' ' -f2)
+        
+        # Test if the site is accessible
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://$CLOUDFRONT_URL)
+        if [ $HTTP_STATUS -eq 200 ]; then
+          echo "✅ CloudFront deployment successful - Status: $HTTP_STATUS"
+        else
+          echo "❌ CloudFront deployment failed - Status: $HTTP_STATUS"
+          exit 1
+        fi
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }} 
