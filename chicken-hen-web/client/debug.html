@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Debug - Chicken Hen Game</title>
+    <style>
+        body {
+            margin: 20px;
+            font-family: monospace;
+            background: #f0f0f0;
+        }
+        #log {
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 200px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+        .log-entry {
+            margin: 2px 0;
+            font-size: 12px;
+        }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+        canvas {
+            border: 2px solid black;
+            background: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Game Debug Console</h1>
+    <div id="log"></div>
+    <canvas id="testCanvas" width="800" height="450"></canvas>
+    
+    <script>
+        const log = document.getElementById('log');
+        const canvas = document.getElementById('testCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        function addLog(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${new Date().toISOString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+        
+        // Test 1: Canvas rendering
+        addLog('Testing canvas rendering...', 'info');
+        try {
+            ctx.fillStyle = 'red';
+            ctx.fillRect(50, 50, 100, 100);
+            ctx.fillStyle = 'green';
+            ctx.fillRect(200, 50, 100, 100);
+            ctx.fillStyle = 'blue';
+            ctx.fillRect(350, 50, 100, 100);
+            addLog('✓ Canvas rendering works', 'success');
+        } catch (e) {
+            addLog('✗ Canvas error: ' + e.message, 'error');
+        }
+        
+        // Test 2: WebSocket connection
+        addLog('Testing WebSocket connection...', 'info');
+        const wsUrl = 'wss://y4bhad7iq9.execute-api.us-east-1.amazonaws.com/prod';
+        const ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+            addLog('✓ WebSocket connected', 'success');
+            addLog('Sending join message...', 'info');
+            ws.send(JSON.stringify({
+                action: 'join',
+                data: {}
+            }));
+        };
+        
+        ws.onmessage = (event) => {
+            const message = JSON.parse(event.data);
+            addLog(`Received: ${message.type}`, 'info');
+            
+            if (message.type === 'gameState') {
+                const state = message.data;
+                addLog(`Game state received:`, 'success');
+                addLog(`- Players: ${Object.keys(state.players).length}`, 'info');
+                addLog(`- Platforms: ${state.platforms.length}`, 'info');
+                addLog(`- Enemies: ${state.enemies.length}`, 'info');
+                
+                // Try to render the game state
+                try {
+                    // Clear canvas
+                    ctx.fillStyle = 'black';
+                    ctx.fillRect(0, 0, 800, 450);
+                    
+                    // Draw platforms
+                    ctx.fillStyle = 'red';
+                    state.platforms.forEach(plat => {
+                        ctx.fillRect(plat.x, plat.y, plat.w, plat.h);
+                        addLog(`Drew platform at ${plat.x},${plat.y} size ${plat.w}x${plat.h}`, 'info');
+                    });
+                    
+                    // Draw enemies
+                    state.enemies.forEach(enemy => {
+                        ctx.fillStyle = enemy.color || 'yellow';
+                        ctx.fillRect(enemy.pos.x - 10, enemy.pos.y - 10, 20, 20);
+                        addLog(`Drew enemy at ${enemy.pos.x},${enemy.pos.y}`, 'info');
+                    });
+                    
+                    addLog('✓ Rendered game state successfully', 'success');
+                } catch (e) {
+                    addLog('✗ Render error: ' + e.message, 'error');
+                }
+            }
+        };
+        
+        ws.onerror = (error) => {
+            addLog('✗ WebSocket error: ' + error, 'error');
+        };
+        
+        ws.onclose = () => {
+            addLog('WebSocket closed', 'info');
+        };
+        
+        // Test 3: Check if game.js loads
+        addLog('Checking if game.js exists...', 'info');
+        fetch('game.js?v=1.0.2')
+            .then(response => {
+                if (response.ok) {
+                    addLog('✓ game.js loaded successfully', 'success');
+                } else {
+                    addLog('✗ game.js failed to load: ' + response.status, 'error');
+                }
+            })
+            .catch(error => {
+                addLog('✗ game.js fetch error: ' + error, 'error');
+            });
+    </script>
+</body>
+</html>

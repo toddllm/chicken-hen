@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Chicken Hen Multiplayer Adventure</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #222;
+            font-family: Arial, sans-serif;
+        }
+        #gameContainer {
+            text-align: center;
+        }
+        canvas { 
+            border: 2px solid #444; 
+            background: black;
+            display: block;
+            margin: 0 auto;
+        }
+        #status {
+            color: white;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+        #instructions {
+            color: #ccc;
+            margin-bottom: 10px;
+            font-size: 12px;
+            max-width: 800px;
+            text-align: left;
+        }
+        .controls-section {
+            margin-bottom: 8px;
+        }
+        .controls-title {
+            color: #fff;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .attack-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            margin-top: 5px;
+        }
+        .attack-item {
+            background: #333;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="instructions">
+            <div class="controls-section">
+                <div class="controls-title">Movement Controls:</div>
+                <div>Arrow Keys: Move left/right • Space: Jump • Down Arrow: Smash</div>
+            </div>
+            <div class="controls-section">
+                <div class="controls-title">Attack System:</div>
+                <div class="attack-grid">
+                    <div class="attack-item">Q - Peck (15 dmg)</div>
+                    <div class="attack-item">E - Kick (25 dmg)</div>
+                    <div class="attack-item">R - Punch (20 dmg)</div>
+                    <div class="attack-item">F - Egg Throw (30 dmg)</div>
+                    <div class="attack-item">G - KO Move (50 dmg)</div>
+                    <div class="attack-item">T - Throw Enemy (40 dmg)</div>
+                </div>
+            </div>
+            <div class="controls-section">
+                <div class="controls-title">Special:</div>
+                <div>M - Mega Chicken Transform (requires password + Golden Egg) • Shift - Block (50% damage reduction)</div>
+            </div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="450"></canvas>
+        <div id="status">Connecting...</div>
+    </div>
+    <script src="game.js?v=2.0.0"></script>
+</body>
+</html>

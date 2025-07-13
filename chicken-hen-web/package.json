@@ -1,0 +1,33 @@
+{
+  "name": "chicken-hen-game",
+  "version": "1.0.0",
+  "description": "Multiplayer Chicken Hen Adventure Game",
+  "main": "server/websocket-handler.js",
+  "scripts": {
+    "deploy": "serverless deploy",
+    "deploy:prod": "serverless deploy --stage prod",
+    "deploy:dev": "serverless deploy --stage dev",
+    "remove": "serverless remove",
+    "logs": "serverless logs -f defaultHandler -t",
+    "deploy:client": "aws s3 sync ./client s3://${npm_config_bucket}/ --delete --exclude '.DS_Store'",
+    "invalidate": "aws cloudfront create-invalidation --distribution-id ${npm_config_distribution} --paths '/*'",
+    "full-deploy": "npm run deploy && npm run deploy:client && npm run invalidate"
+  },
+  "keywords": [
+    "game",
+    "multiplayer",
+    "websocket",
+    "aws",
+    "lambda"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "aws-sdk": "^2.1494.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-domain-manager": "^7.3.3"
+  }
+}

@@ -1,0 +1,207 @@
+service: chicken-hen-game
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  stage: ${opt:stage, 'prod'}
+  region: ${opt:region, 'us-east-1'}
+  
+  environment:
+    CONNECTIONS_TABLE: ${self:service}-connections-${self:provider.stage}
+    GAME_STATE_TABLE: ${self:service}-game-state-${self:provider.stage}
+    WEBSOCKET_ENDPOINT:
+      Fn::Join:
+        - ''
+        - - 'https://'
+          - Ref: WebsocketsApi
+          - '.execute-api.'
+          - ${self:provider.region}
+          - '.amazonaws.com/'
+          - ${self:provider.stage}
+  
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - Fn::GetAtt: [ConnectionsTable, Arn]
+            - Fn::GetAtt: [GameStateTable, Arn]
+        - Effect: Allow
+          Action:
+            - execute-api:ManageConnections
+          Resource:
+            - arn:aws:execute-api:${self:provider.region}:*:*/@connections/*
+
+functions:
+  connectHandler:
+    handler: server/websocket-handler.handler
+    events:
+      - websocket:
+          route: $connect
+  
+  disconnectHandler:
+    handler: server/websocket-handler.handler
+    events:
+      - websocket:
+          route: $disconnect
+  
+  defaultHandler:
+    handler: server/websocket-handler.handler
+    events:
+      - websocket:
+          route: $default
+
+resources:
+  Resources:
+    ConnectionsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.CONNECTIONS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: connectionId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: connectionId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        SSESpecification:
+          SSEEnabled: true
+    
+    GameStateTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.GAME_STATE_TABLE}
+        AttributeDefinitions:
+          - AttributeName: gameId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: gameId
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        SSESpecification:
+          SSEEnabled: true
+    
+    # S3 Bucket for static hosting
+    StaticSiteBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:service}-static-${self:provider.stage}
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: error.html
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - GET
+                - HEAD
+              AllowedOrigins:
+                - "*"
+              MaxAge: 3600
+    
+    # Bucket Policy
+    StaticSiteBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket:
+          Ref: StaticSiteBucket
+        PolicyDocument:
+          Statement:
+            - Sid: PublicReadGetObject
+              Effect: Allow
+              Principal: "*"
+              Action:
+                - s3:GetObject
+              Resource:
+                Fn::Join:
+                  - ""
+                  - - "arn:aws:s3:::"
+                    - Ref: StaticSiteBucket
+                    - "/*"
+    
+    # CloudFront Distribution
+    CloudFrontDistribution:
+      Type: AWS::CloudFront::Distribution
+      Properties:
+        DistributionConfig:
+          Enabled: true
+          Comment: Chicken Hen Game Distribution
+          DefaultRootObject: index.html
+          Origins:
+            - Id: S3Origin
+              DomainName:
+                Fn::GetAtt: [StaticSiteBucket, RegionalDomainName]
+              S3OriginConfig:
+                OriginAccessIdentity: ""
+          DefaultCacheBehavior:
+            TargetOriginId: S3Origin
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods:
+              - GET
+              - HEAD
+              - OPTIONS
+            CachedMethods:
+              - GET
+              - HEAD
+            Compress: true
+            ForwardedValues:
+              QueryString: true
+              Cookies:
+                Forward: none
+              Headers:
+                - Origin
+                - Access-Control-Request-Method
+                - Access-Control-Request-Headers
+            DefaultTTL: 300
+            MaxTTL: 86400
+            MinTTL: 0
+          PriceClass: PriceClass_100
+          ViewerCertificate:
+            CloudFrontDefaultCertificate: true
+  
+  Outputs:
+    WebSocketURL:
+      Description: "WebSocket URL"
+      Value:
+        Fn::Join:
+          - ''
+          - - 'wss://'
+            - Ref: WebsocketsApi
+            - '.execute-api.'
+            - ${self:provider.region}
+            - '.amazonaws.com/'
+            - ${self:provider.stage}
+    
+    StaticSiteURL:
+      Description: "Static site URL"
+      Value:
+        Fn::GetAtt: [CloudFrontDistribution, DomainName]
+    
+    S3BucketName:
+      Description: "S3 Bucket Name for static hosting"
+      Value:
+        Ref: StaticSiteBucket
+
+custom:
+  # Custom domain configuration for ws.softwarecompanyinabox.com
+  customDomain:
+    domainName: ws.softwarecompanyinabox.com
+    stage: ${self:provider.stage}
+    basePath: ''
+    certificateName: '*.softwarecompanyinabox.com'
+    createRoute53Record: true
+    endpointType: 'regional'
+    securityPolicy: tls_1_2

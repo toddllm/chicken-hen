@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Canvas Test</title>
+</head>
+<body>
+    <h2>Simple Canvas Test</h2>
+    <canvas id="canvas" width="800" height="450" style="border: 1px solid black; background: black;"></canvas>
+    <pre id="output"></pre>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const output = document.getElementById('output');
+        
+        function log(msg) {
+            output.textContent += msg + '\n';
+        }
+        
+        // Test 1: Draw simple shapes
+        log('Drawing test shapes...');
+        
+        // Red rectangle (platform)
+        ctx.fillStyle = 'red';
+        ctx.fillRect(0, 430, 800, 20);
+        log('Drew ground platform');
+        
+        // Green square (player)
+        ctx.fillStyle = 'green';
+        ctx.fillRect(50, 380, 40, 50);
+        log('Drew player');
+        
+        // Test the Platform class
+        class Platform {
+            constructor(x, y, w, h) {
+                this.x = x;
+                this.y = y;
+                this.w = w;
+                this.h = h;
+            }
+            
+            draw() {
+                ctx.fillStyle = 'red';
+                ctx.fillRect(this.x, this.y, this.w, this.h);
+            }
+        }
+        
+        // Create and draw a platform
+        const testPlatform = new Platform(200, 300, 100, 20);
+        testPlatform.draw();
+        log('Drew test platform at 200,300');
+        
+        // Test game state
+        const testGameState = {
+            platforms: [
+                { x: 0, y: 430, w: 800, h: 20, type: 'normal' },
+                { x: 200, y: 300, w: 100, h: 20, type: 'moving' },
+                { x: 400, y: 200, w: 100, h: 20, type: 'fading' }
+            ]
+        };
+        
+        log('\nDrawing platforms from game state:');
+        testGameState.platforms.forEach((p, i) => {
+            ctx.fillStyle = p.type === 'moving' ? 'orange' : 
+                           p.type === 'fading' ? 'purple' : 'red';
+            ctx.fillRect(p.x, p.y, p.w, p.h);
+            log(`Platform ${i}: ${p.type} at ${p.x},${p.y}`);
+        });
+        
+        // Add labels
+        ctx.fillStyle = 'white';
+        ctx.font = '12px Arial';
+        ctx.fillText('If you see colored rectangles, canvas is working!', 10, 20);
+    </script>
+</body>
+</html>
