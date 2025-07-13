@@ -574,38 +574,56 @@ async function checkCollisions(playerId) {
     if (!player || player.invulnerable > 0) return;
     
     // Enemy collisions
-    for (const enemy of gameState.enemies) {
+    for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+        const enemy = gameState.enemies[i];
         const dx = Math.abs(player.pos.x - enemy.pos.x);
         const dy = Math.abs(player.pos.y - enemy.pos.y);
-        
-        if (dx < 30 && dy < 30 && player.vel.y <= 0) {
-            // Player hit
-            applyDamage(player, 25, false);
-            player.invulnerable = 120; // 2 seconds at 60 FPS
-            
-            if (player.health <= 0) {
-                player.lives--;
-                if (player.lives > 0) {
-                    // Respawn
-                    player.health = player.maxHealth;
-                    player.pos = { x: 50, y: 400 };
-                    player.vel = { x: 0, y: 0 };
-                } else {
-                    // Remove player
-                    delete gameState.players[playerId];
-                    await broadcast({
-                        type: 'playerLeft',
-                        playerId
-                    });
-                }
+
+        if (dx < 30 && dy < 30) {
+            if (player.vel.y > 0 && player.pos.y < enemy.pos.y) {
+                // Player crushed enemy
+                gameState.enemies.splice(i, 1);
+                await broadcast({
+                    type: 'enemyKilled',
+                    data: enemy.pos
+                });
+                await sendToConnection(playerId, {
+                    type: 'enemyCrushed',
+                    enemy: enemy.name
+                });
+                player.vel.y = -10;
+                return;
             }
-            
-            await sendToConnection(playerId, {
-                type: 'playerDamaged',
-                damage: 25,
-                health: player.health
-            });
-            return;
+
+            if (player.vel.y <= 0) {
+                // Player hit
+                applyDamage(player, 25, false);
+                player.invulnerable = 120; // 2 seconds at 60 FPS
+
+                if (player.health <= 0) {
+                    player.lives--;
+                    if (player.lives > 0) {
+                        // Respawn
+                        player.health = player.maxHealth;
+                        player.pos = { x: 50, y: 400 };
+                        player.vel = { x: 0, y: 0 };
+                    } else {
+                        // Remove player
+                        delete gameState.players[playerId];
+                        await broadcast({
+                            type: 'playerLeft',
+                            playerId
+                        });
+                    }
+                }
+
+                await sendToConnection(playerId, {
+                    type: 'playerDamaged',
+                    damage: 25,
+                    health: player.health
+                });
+                return;
+            }
         }
     }
     

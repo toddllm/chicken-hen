@@ -522,11 +522,22 @@ function handleMessage(message) {
             
         case 'enemyKilled':
             // Remove enemy
-            enemies = enemies.filter(e => 
+            enemies = enemies.filter(e =>
                 !(e.pos.x === message.data.x && e.pos.y === message.data.y)
             );
             break;
-            
+
+        case 'enemyCrushed':
+            console.log('Enemy crushed:', message.enemy);
+            break;
+
+        case 'playerDamaged':
+            if (message.health !== undefined && players[myId]) {
+                players[myId].health = message.health;
+                players[myId].invulnerable = 120; // Match server invulnerability
+            }
+            break;
+
         case 'zeldinaRescued':
             if (zeldina) zeldina.rescued = true;
             break;

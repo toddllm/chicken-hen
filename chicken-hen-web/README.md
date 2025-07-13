@@ -91,6 +91,7 @@ This script will:
 - **Platform Types**: Normal, Moving, and Fading platforms
 - **Boss Fight**: Defeat the boss after rescuing Zeldina
 - **Real-time Synchronization**: All player movements and actions are synchronized
+- **Collision Events**: Detect when a player crushes an enemy or takes damage
 
 ## Game Controls
 
